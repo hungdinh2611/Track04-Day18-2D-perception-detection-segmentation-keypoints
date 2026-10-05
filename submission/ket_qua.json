@@ -1,0 +1,74 @@
+{
+  "progress": {
+    "box_iou": "ok",
+    "nms": "ok",
+    "batched_nms": "ok",
+    "average_precision": "ok",
+    "mask_iou": "ok",
+    "polygon_to_mask": "ok",
+    "mask_to_yolo_seg": "ok",
+    "autolabel": "ok",
+    "oks": "ok",
+    "joint_angle": "ok",
+    "FLIP_IDX": "ok"
+  },
+  "latency": [
+    {
+      "Cấu hình": "one-to-many + NMS, conf 0.25",
+      "preprocess (ms)": 1.78,
+      "inference (ms)": 10.6,
+      "postprocess (ms)": 1.34,
+      "số box": 5
+    },
+    {
+      "Cấu hình": "one-to-many + NMS, conf 0.001",
+      "preprocess (ms)": 1.74,
+      "inference (ms)": 10.58,
+      "postprocess (ms)": 1.45,
+      "số box": 203
+    },
+    {
+      "Cấu hình": "one-to-one NMS-free, conf 0.25",
+      "preprocess (ms)": 1.75,
+      "inference (ms)": 10.96,
+      "postprocess (ms)": 0.48,
+      "số box": 5
+    },
+    {
+      "Cấu hình": "one-to-one NMS-free, conf 0.001",
+      "preprocess (ms)": 1.77,
+      "inference (ms)": 11.09,
+      "postprocess (ms)": 0.49,
+      "số box": 204
+    }
+  ],
+  "result_4b": {
+    "flip_idx": "giải phẫu",
+    "epochs": 40,
+    "imgsz": 640,
+    "Box mAP50-95": 0.9124941793981944,
+    "Pose mAP50": 0.995,
+    "Pose mAP50-95": 0.41038278164972136,
+    "train (phút)": 2.7
+  },
+  "result_4c": null,
+  "answers": {
+    "Q1": "Có 6.300 dự đoán thô: 80×60 + 40×30 + 20×15 = 4.800 + 1.200 + 300, tương ứng ba tầng stride 8, 16, 32 trên ảnh 640×480; ảnh vuông 640×640 có 8.400 vị trí. File lệch nửa chiều rộng và chiều cao khi vẽ là cxcywh nhưng bị đọc như xyxy: tâm bị dùng làm góc trên-trái thay vì trừ đi nửa kích thước.",
+    "Q2": "Trong lần chạy này, cột postprocess (ms) đổi nhiều nhất ở conf=0.001: 1.45 ms với one-to-many so với 0.49 ms với one-to-one. Ở conf thấp và cảnh đông, head one-to-many sinh nhiều box trùng nên NMS tốn thêm thời gian; head one-to-one giảm bước hậu xử lý, điều này đặc biệt hữu ích trên CPU/NPU nơi phép xử lý phụ thuộc dữ liệu và đồng bộ thường đắt hơn.",
+    "Q3": "Vì IoU 0,75 lớn hơn ngưỡng 0,7, NMS giữ box có score cao hơn và loại box kia; nếu tăng ngưỡng sẽ giữ được nhiều box sát nhau hơn nhưng dễ giữ duplicate, còn giảm ngưỡng khử duplicate mạnh hơn nhưng có thể bỏ nhầm hai người thật. YOLO26 vẫn huấn luyện head one-to-many vì nhiều dự đoán dương tính giúp tạo giám sát dày và hỗ trợ hội tụ/chất lượng huấn luyện, trong khi head one-to-one cho suy luận NMS-free.",
+    "Q4": "Semantic segmentation chỉ ghi class nên hai người chạm nhau có thể thành một vùng (đếm thiếu), còn một người bị che hoặc mask đứt đoạn có thể tách thành nhiều vùng (đếm thừa); panoptic segmentation kết hợp class với ID riêng cho từng instance. Bản đồ trong bài gán nhiều pixel xe buýt thành train, một nhầm lẫn giữa hai class có hình dáng dài, nhiều cửa sổ và cấu trúc tương tự mà model học từ dữ liệu huấn luyện.",
+    "Q5": "Mask R-CNN có lưới mask cố định 28×28 cho mỗi RoI nên biên của vật thể lớn dễ thô; YOLO-seg dùng các prototype có độ phân giải không gian cố định nên vật thể nhỏ/mảnh dễ mất chi tiết ở độ phân giải thấp. Ghép tham lam có thể để nhiều mask YOLO cùng chọn một mask Mask R-CNN tốt nhất, khiến một mask còn lại không được ghép; Hungarian tối ưu tổng IoU với ràng buộc một-một.",
+    "Q6": "Prompt A ở gần tâm người thường cho mask gần toàn thân (README ghi IoU khoảng 0,99), còn điểm B gần chân có thể chỉ chọn một mảnh nhỏ (IoU có thể gần 0); một điểm không mô tả biên và đối tượng cần tách nên SAM dễ chọn vùng không mong muốn. Box cung cấp vùng không gian và ngữ cảnh đầy đủ hơn; dùng SAM trực tiếp khi cần prompt linh hoạt/chất lượng cao, còn dùng SAM tạo nhãn rồi huấn luyện YOLO-seg khi cần suy luận nhanh, nhẹ và quy mô lớn.",
+    "Q7": "Khi hạ ngưỡng xuống -100, các điểm đầu gối/mắt cá vẫn được vẽ tại vị trí cực đại của heatmap trong vùng dự đoán, thường sát mép dưới khung hình dù phần chân thật nằm ngoài ảnh. Argmax luôn trả một tọa độ ngay cả khi heatmap không có đỉnh đáng tin cậy, vì vậy phải dùng confidence/độ mạnh heatmap để loại hoặc đánh dấu keypoint không chắc chắn thay vì coi mọi tọa độ là quan sát thật.",
+    "Q8": "Theo đường cong, OKS của người 40×80 giảm xuống dưới 0,5 ở khoảng 7–8 px sai số; với người 250×500 ngưỡng lớn hơn 30 px (ước tính theo kỳ vọng công thức khoảng 44 px, ngoài miền 0–30 px của đồ thị). Sigma nhỏ của mắt làm cùng một sai số pixel bị phạt nặng hơn hông vì mắt cần định vị chính xác hơn. Với người chỉ cao 80 px, camera trên cao làm sai số vài pixel đáng kể, nên cần đủ độ phân giải/zoom, dữ liệu phù hợp góc nhìn và ưu tiên keypoint đáng tin cậy.",
+    "Q9": "Luật có thể báo nhầm khi người cúi nhặt đồ hoặc ngồi buộc dây làm thân nghiêng quá 60°, và bỏ sót khi người ngã nằm ngang nhưng trục vai-hông không vượt ngưỡng hoặc các điểm bị che. Ảnh xoay làm giảm phát hiện dù số người không đổi vì detector không bất biến với phép quay và hướng đó khác phân bố tư thế/upright khi huấn luyện. Hệ thống thật cần theo dõi nhiều khung hình, confidence và hysteresis, xử lý occlusion/ROI, rồi kết hợp ngữ cảnh và xác nhận an toàn thay vì quyết định từ một khung hình.",
+    "Q10": "Không thể kết luận mAP sẽ không giảm: lật ngang khi train cùng flip_idx đồng nhất tạo nhãn trái/phải sai trên các ảnh đã lật, gây nhiễu và có thể làm giảm điểm. Dù vậy, val chỉ gồm hổ quay phải không bộc lộ rõ lỗi giải phẫu khi gặp hướng đối diện; bug lộ ra khi triển khai có hổ quay trái hoặc ảnh gương, nên cần flip_idx giải phẫu và đánh giá trên cả hai hướng.",
+    "Q11": "Ở Frame_192.jpg và Frame_191.jpg, hai chân sau chồng lấp khi hổ bước nên các keypoint hock/paw dự đoán tụ gần nhau và khó khớp với từng chân; nên bổ sung ảnh nhiều pha bước và che khuất, đồng thời rà soát nhất quán nhãn trái/phải. Ở Frame_37.jpg và Frame_17.jpg, sai số vàng dài tại bàn chân cho thấy vị trí chân đang vung/lúc tiếp đất bị định vị lệch; nên thêm ảnh độ phân giải cao ở nhiều pha chuyển động, kiểm tra lại nhãn paw và dùng thông tin theo thời gian (tracking/smoothing) nếu triển khai trên video.",
+    "Q12": "Dùng cùng sigma cho 12 điểm giúp có metric nhất quán khi chưa có thống kê riêng, nhưng không phản ánh việc mũi, khớp chân và gốc đuôi có độ mơ hồ/độ chính xác chú giải khác nhau. Với dataset custom, ước lượng độ biến thiên tọa độ từng điểm giữa nhiều người gán nhãn sau khi chuẩn hóa theo kích thước đối tượng, dùng tập val đại diện để hiệu chỉnh sigma rồi kiểm tra metric và chất lượng thực tế trên các ca khó."
+  },
+  "env": {
+    "device": "cuda",
+    "torch": "2.11.0+cu130",
+    "ultralytics": "8.4.171"
+  }
+}
